@@ -58,4 +58,27 @@ foreach ($db->users() as $user)
 		railway_log('User "' . $user->username . '" had the default password; replaced it with GROCY_ADMIN_PASSWORD.');
 	}
 }
+// Grocy answers the first web request after an install or update with a bare redirect to
+// "/" while it resets its view cache (app.php). Do that reset here, so a deployer's first
+// login form post is processed instead of being dropped.
+if (GROCY_MODE !== 'dev')
+{
+	$viewcache = $dataPath . '/viewcache';
+	if (!is_dir($viewcache))
+	{
+		mkdir($viewcache, 0775, true);
+	}
+	$hashFile = $viewcache . '/' . hash('sha256', file_get_contents('/app/www/version.json') . GROCY_BASE_URL . GROCY_BASE_PATH) . '.txt';
+	if (!file_exists($hashFile))
+	{
+		$it = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($viewcache, FilesystemIterator::SKIP_DOTS), RecursiveIteratorIterator::CHILD_FIRST);
+		foreach ($it as $f)
+		{
+			$f->isDir() ? rmdir($f->getPathname()) : unlink($f->getPathname());
+		}
+		touch($hashFile);
+		railway_log('View cache reset for this Grocy version.');
+	}
+}
+
 railway_log('Bootstrap complete.');

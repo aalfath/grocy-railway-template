@@ -37,6 +37,7 @@ Grocy's stock behaviour is unchanged. The wrapper (`root/`) adds one s6 boot ste
 
 - **No `admin`/`admin` login.** Grocy creates its database on the first web request and seeds the user `admin` with the password `admin`. The boot step runs Grocy's own migrations first, with the first user's name and password taken from the variables, so the default password never exists on the public URL. On every boot, any user whose password is still `admin` gets `GROCY_ADMIN_PASSWORD` instead.
 - **nginx on `$PORT`** over plain HTTP (Railway terminates TLS), with `X-Forwarded-Proto` passed to PHP so Grocy builds `https://` links.
+- **First request served normally.** After an install or update, Grocy answers the first web request with a redirect to `/` while it clears its view cache, which drops a login form posted at that moment. The boot step clears the cache instead.
 - **`/healthz`**: answers 200 without a login only when the database exists, is migrated and has a user. Railway's health check uses it.
 - **nginx workers and DNS resolver** set for Railway (the image would size nginx from the host's core count, and fall back to a resolver that doesn't exist here).
 
