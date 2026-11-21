@@ -1,0 +1,12 @@
+services:
+  grocy:
+    build: .
+    environment:
+      PORT: "8080"
+      TZ: Etc/UTC
+      GROCY_ADMIN_USERNAME: admin
+      GROCY_ADMIN_PASSWORD: local-test-password
+    ports: ["8080:8080"]
+    volumes: ["grocydata:/config"]
+volumes:
+  grocydata: {}

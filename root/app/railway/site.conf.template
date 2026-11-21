@@ -1,0 +1,39 @@
+# Written by /etc/s6-overlay/s6-rc.d/init-railway/run on every boot. Edits here are lost.
+map $http_x_forwarded_proto $railway_https {
+    default "";
+    https on;
+}
+
+server {
+    listen __PORT__ default_server;
+    listen [::]:__PORT__ default_server;
+    server_name _;
+
+    root /app/www/public;
+    index index.php;
+    client_max_body_size 50m;
+
+    # Anonymous health probe for Railway (every Grocy page needs a login).
+    location = /healthz {
+        include /etc/nginx/fastcgi_params;
+        fastcgi_param SCRIPT_FILENAME /app/railway/healthz.php;
+        fastcgi_pass 127.0.0.1:9000;
+    }
+
+    location / {
+        try_files $uri $uri/ /index.php$is_args$args;
+    }
+
+    location ~ ^(.+\.php)(.*)$ {
+        fastcgi_split_path_info ^(.+\.php)(.*)$;
+        if (!-f $document_root$fastcgi_script_name) { return 404; }
+        fastcgi_pass 127.0.0.1:9000;
+        fastcgi_index index.php;
+        include /etc/nginx/fastcgi_params;
+        fastcgi_param HTTPS $railway_https if_not_empty;
+    }
+
+    location ~ /\.ht {
+        deny all;
+    }
+}

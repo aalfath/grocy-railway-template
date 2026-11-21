@@ -1,0 +1,32 @@
+#!/usr/bin/with-contenv bash
+# shellcheck shell=bash
+# Railway boot step. Runs after init-config-end (the image has linked /app/www/data to
+# /config/data and copied config.php) and before nginx, php-fpm and cron start.
+
+PORT="${PORT:-8080}"
+echo "[railway] nginx will listen on ${PORT}"
+
+# nginx: plain HTTP on $PORT (Railway terminates TLS), rewritten every boot so image
+# updates reach existing volumes.
+mkdir -p /config/nginx/site-confs /config/log/nginx
+sed "s|__PORT__|${PORT}|g" /app/railway/site.conf.template >/config/nginx/site-confs/default.conf
+
+# The image sizes nginx from nproc once (a Railway host reports far more cores than the
+# service gets). Keep it small and fixed.
+printf 'worker_processes %s;\n' "${NGINX_WORKER_PROCESSES:-2}" >/config/nginx/worker_processes.conf
+
+# Railway's resolv.conf lists only an IPv6 nameserver; the image then falls back to
+# 127.0.0.11, which doesn't exist here. Use the real one.
+NS=$(awk '$1=="nameserver"{print $2; exit}' /etc/resolv.conf)
+if [[ -n "${NS}" ]]; then
+    [[ "${NS}" == *:* ]] && NS="[${NS}]"
+    printf 'resolver %s valid=30s;\n' "${NS}" >/config/nginx/resolver.conf
+fi
+
+# Database schema and first admin, before the web server can answer.
+mkdir -p /config/data
+lsiown -R abc:abc /config/data
+if ! s6-setuidgid abc php /app/railway/bootstrap.php; then
+    echo "[railway] ERROR: bootstrap failed; /healthz will report unhealthy"
+fi
+exit 0
